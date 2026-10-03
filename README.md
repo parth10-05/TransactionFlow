@@ -2,6 +2,8 @@
 
 A Docker-based, end-to-end **financial transaction data pipeline** built to demonstrate a classic data-engineering stack: **Kafka → Spark Structured Streaming → HDFS + PostgreSQL → REST API → live Next.js dashboard**.
 
+The cluster topology runs entirely inside Docker containers and demonstrates a **minimum viable three-node architecture**: 1 Spark master + 2 Spark workers, 1 HDFS NameNode + 2 HDFS DataNodes.
+
 A Spring Boot producer generates random transaction events and publishes them to Kafka. A Spark Structured Streaming job consumes the stream, validates and normalises records, writes raw/rejected data to HDFS as Parquet/JSON, computes aggregations, and writes curated metrics to PostgreSQL. A Spring Boot reporting API serves those metrics to a Next.js dashboard with a live architecture diagram and a world map of transaction activity.
 
 ---
@@ -98,7 +100,7 @@ HDFS paths, file counts, and checkpoint status.
 ## Prerequisites
 
 - **Docker Desktop** (the only thing you need installed). No local Java, Maven, Node.js, Kafka, Spark, Hadoop, or PostgreSQL required.
-- ~6–8 GB of RAM available to Docker is recommended (Spark + HDFS + Kafka + 3 app builds).
+- ~8–10 GB of RAM available to Docker is recommended (2 Spark workers + 2 HDFS DataNodes + Kafka + 3 app builds).
 
 ---
 
@@ -117,11 +119,12 @@ docker compose up --build -d
 First start takes several minutes (Maven builds, npm install, image pulls). The startup order is handled by health checks and `depends_on`:
 
 ```
-kafka + postgres + hdfs-namenode  →  (healthy)
-kafka-init + hdfs-init            →  create topics / directories, then exit 0
-spark-master + spark-worker       →  start
-producer + reporting + frontend   →  start
-spark-streaming-job               →  waits for Kafka + HDFS + Postgres, then streams
+kafka + postgres + hdfs-namenode      →  (healthy)
+kafka-init + hdfs-init                →  create topics / directories, then exit 0
+spark-master + spark-worker-1/2       →  start (2 workers register with master)
+hdfs-datanode-1/2                     →  start (2 DataNodes register with NameNode)
+producer + reporting + frontend       →  start
+spark-streaming-job                   →  waits for Kafka + HDFS + Postgres + both workers, then streams
 ```
 
 Once everything is up, **start generating data** (nothing flows until the generator runs):
@@ -135,6 +138,160 @@ curl -X POST http://localhost:8081/api/generator/start ^
 Then open the dashboard at **http://localhost:3000**.
 
 > On macOS/Linux replace the `^` line-continuation with `\` and use single quotes for the JSON body.
+
+---
+
+## Cluster Verification
+
+After `docker compose up`, confirm the full cluster is live with these commands:
+
+### 1 — All containers running
+
+```bash
+docker compose ps
+```
+
+Expected: 15 services all showing `running` (or `exited 0` for the two init jobs). You should see:
+- `transactionflow-spark-worker-1`
+- `transactionflow-spark-worker-2`
+- `transactionflow-hdfs-datanode-1`
+- `transactionflow-hdfs-datanode-2`
+
+### 2 — Spark Master shows 2 live workers
+
+Open **http://localhost:8080** in your browser and look for **2 Workers** listed in the _Workers_ table, both in `ALIVE` state.
+
+Or query the REST API (available in Spark 3.x with the history-server API):
+
+```bash
+# Workers appear as Alive Workers: 2 in the master web UI
+start http://localhost:8080
+```
+
+### 3 — HDFS shows 2 live DataNodes
+
+```bash
+docker exec transactionflow-hdfs-namenode hdfs dfsadmin -report
+```
+
+Look for:
+
+```
+Live datanodes (2):
+```
+
+and two blocks — one for `hdfs-datanode-1` and one for `hdfs-datanode-2`.
+
+---
+
+## Professor Demonstration: Distributed HDFS Storage
+
+This section shows how to prove that TransactionFlow writes data in a **genuinely distributed** fashion across **two physical HDFS DataNodes**.
+
+### Why replication factor 2 matters
+
+With `HDFS_REPLICATION=2` (set in `.env` / `.env.example`) and two live DataNodes, every HDFS block is written to **both** DataNodes.  This means:
+
+- If one DataNode container dies, no data is lost (the other holds a complete copy).
+- The `hdfs fsck -files -blocks -locations` output will list **two block replicas**, each pinned to a different DataNode.
+
+For replication to work, **both DataNode containers must be running and registered** before data is written.
+
+---
+
+### Step 1 — Generate enough data
+
+```bash
+# Windows PowerShell / CMD (replace ^ with \ on Linux/macOS)
+curl -X POST http://localhost:8081/api/generator/burst ^
+  -H "Content-Type: application/json" ^
+  -d "{\"numberOfEvents\":500,\"invalidPercentage\":5,\"highValuePercentage\":2,\"unknownTypePercentage\":3}"
+```
+
+Wait ~30 seconds for the Spark streaming job to complete a batch.
+
+---
+
+### Step 2 — Confirm two live DataNodes (cluster health proof)
+
+```bash
+docker exec transactionflow-hdfs-namenode hdfs dfsadmin -report
+```
+
+Look for:
+
+```
+Live datanodes (2):
+```
+
+This proves the HDFS cluster has two registered, healthy nodes.  It does **not** yet prove that files exist or that blocks are distributed.
+
+---
+
+### Step 3 — List HDFS output (file existence proof)
+
+```bash
+docker exec transactionflow-hdfs-namenode hdfs dfs -ls -R /data/transactionflow
+```
+
+Expected output includes Parquet part files under:
+- `/data/transactionflow/raw/transactions/year=.../month=.../day=.../`
+- `/data/transactionflow/rejected/transactions/` (if any invalid events were sent)
+- `/data/transactionflow/checkpoints/` (Spark recovery data)
+
+This proves files **exist** on HDFS.  It does not prove which DataNodes hold the blocks.
+
+---
+
+### Step 4 — Inspect block distribution (replication proof)
+
+```bash
+docker exec transactionflow-hdfs-namenode \
+  hdfs fsck /data/transactionflow/raw/transactions \
+  -files -blocks -locations
+```
+
+Look for a section like:
+
+```
+/data/transactionflow/raw/transactions/year=.../part-00000-....parquet:
+  Under replicated BP-...: ...
+  Block BP-...: blk_12345 ...
+    0. BP-.../hdfs-datanode-1:9866
+    1. BP-.../hdfs-datanode-2:9866
+```
+
+**Two block locations (one per DataNode) = distributed storage proven.**
+
+For rejected files (if any):
+
+```bash
+docker exec transactionflow-hdfs-namenode \
+  hdfs fsck /data/transactionflow/rejected/transactions \
+  -files -blocks -locations
+```
+
+---
+
+### Step 5 — Automated evidence capture
+
+Run the bundled script from the project root:
+
+```powershell
+.\scripts\capture-hdfs-distribution.ps1
+```
+
+This creates a timestamped directory under `docs/evidence/run_<timestamp>/` containing:
+
+| File | What it proves |
+|---|---|
+| `01_compose_ps.txt` | All containers running |
+| `02_dfsadmin_report.txt` | DataNode count + health |
+| `03_ls_recursive.txt` | File **existence** under canonical paths |
+| `04_fsck_raw.txt` | Block **distribution** across DataNodes |
+| `05_fsck_rejected.txt` | Block distribution for rejected files |
+
+Evidence directories are git-ignored (`docs/evidence/run_*`); only the `.gitkeep` placeholder is committed.
 
 ---
 
@@ -303,14 +460,15 @@ docker exec -it transactionflow-hdfs-namenode hdfs dfs -ls -R /data/transactionf
 
 ## Where the Data Lives
 
-All persistent data is stored in **four Docker named volumes** (declared at the bottom of `docker-compose.yml`):
+All persistent data is stored in **five Docker named volumes** (declared at the bottom of `docker-compose.yml`):
 
 | Volume | What's in it | Container path |
 |---|---|---|
 | `kafka-data` | Kafka topic logs (the raw event stream) | `/var/lib/kafka/data` |
 | `postgres-data` | PostgreSQL tables — metrics, high-value, recent transactions | `/var/lib/postgresql/data` |
 | `hdfs-namenode-data` | HDFS filesystem metadata | `/hadoop/dfs/name` |
-| `hdfs-datanode-data` | HDFS file blocks — the actual Parquet/JSON files | `/hadoop/dfs/data` |
+| `hdfs-datanode-1-data` | HDFS file blocks — DataNode 1 | `/hadoop/dfs/data` |
+| `hdfs-datanode-2-data` | HDFS file blocks — DataNode 2 | `/hadoop/dfs/data` |
 
 ### Physical location
 
@@ -351,8 +509,9 @@ docker exec -it transactionflow-hdfs-namenode hdfs dfs -ls -R /data/transactionf
 
 ```
 transactionflow/
-├── docker-compose.yml          # all 14 services, wired via .env
+├── docker-compose.yml          # all 15 services, wired via .env
 ├── .env                        # single source of truth for ports/credentials/config
+├── .gitattributes              # LF line-ending policy (critical for *.sh on Windows)
 ├── database/schema.sql         # PostgreSQL schema (auto-applied on first start)
 ├── kafka/create-topics.sh
 ├── hdfs/init-hdfs.sh
@@ -417,4 +576,4 @@ The credentials in `.env` and `docker-compose.yml` are **local development crede
 
 ## What This Project Demonstrates
 
-A practical, interview-ready walk-through of how data moves through a modern streaming stack: Kafka for decoupled ingestion, Spark Structured Streaming for validation/transformation/aggregation, HDFS + Parquet for raw analytical storage, PostgreSQL as a curated serving layer, a REST reporting layer, and a live visual dashboard — all reproducible with a single `docker compose up`.
+A practical, interview-ready walk-through of how data moves through a modern streaming stack: Kafka for decoupled ingestion, Spark Structured Streaming for validation/transformation/aggregation running across **two workers**, HDFS + Parquet for raw analytical storage across **two DataNodes**, PostgreSQL as a curated serving layer, a REST reporting layer, and a live visual dashboard — all reproducible with a single `docker compose up`.

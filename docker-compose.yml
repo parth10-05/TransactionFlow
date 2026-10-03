@@ -125,10 +125,10 @@ services:
     networks:
       - transactionflow-net
 
-  hdfs-datanode:
+  hdfs-datanode-1:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: transactionflow-hdfs-datanode
-    hostname: hdfs-datanode
+    container_name: transactionflow-hdfs-datanode-1
+    hostname: hdfs-datanode-1
     depends_on:
       hdfs-namenode:
         condition: service_started
@@ -138,7 +138,24 @@ services:
       - HDFS_CONF_dfs_permissions_enabled=${HDFS_PERMISSIONS_ENABLED}
       - HDFS_CONF_dfs_datanode_data_dir=file:///hadoop/dfs/data
     volumes:
-      - hdfs-datanode-data:/hadoop/dfs/data
+      - hdfs-datanode-1-data:/hadoop/dfs/data
+    networks:
+      - transactionflow-net
+
+  hdfs-datanode-2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: transactionflow-hdfs-datanode-2
+    hostname: hdfs-datanode-2
+    depends_on:
+      hdfs-namenode:
+        condition: service_started
+    environment:
+      - CORE_CONF_fs_defaultFS=${HDFS_DEFAULT_FS}
+      - HDFS_CONF_dfs_replication=${HDFS_REPLICATION}
+      - HDFS_CONF_dfs_permissions_enabled=${HDFS_PERMISSIONS_ENABLED}
+      - HDFS_CONF_dfs_datanode_data_dir=file:///hadoop/dfs/data
+    volumes:
+      - hdfs-datanode-2-data:/hadoop/dfs/data
     networks:
       - transactionflow-net
 
@@ -183,10 +200,23 @@ services:
     networks:
       - transactionflow-net
 
-  spark-worker:
+  spark-worker-1:
     image: apache/spark:3.5.1
-    container_name: transactionflow-spark-worker
-    hostname: spark-worker
+    container_name: transactionflow-spark-worker-1
+    hostname: spark-worker-1
+    depends_on:
+      - spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker ${SPARK_MASTER_URL}
+    environment:
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES}
+    networks:
+      - transactionflow-net
+
+  spark-worker-2:
+    image: apache/spark:3.5.1
+    container_name: transactionflow-spark-worker-2
+    hostname: spark-worker-2
     depends_on:
       - spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker ${SPARK_MASTER_URL}
@@ -214,7 +244,9 @@ services:
         condition: service_healthy
       spark-master:
         condition: service_started
-      spark-worker:
+      spark-worker-1:
+        condition: service_started
+      spark-worker-2:
         condition: service_started
     environment:
       - SPARK_MASTER_URL=${SPARK_MASTER_URL}
@@ -291,7 +323,8 @@ volumes:
   kafka-data:
   postgres-data:
   hdfs-namenode-data:
-  hdfs-datanode-data:
+  hdfs-datanode-1-data:
+  hdfs-datanode-2-data:
 
 networks:
   transactionflow-net:
