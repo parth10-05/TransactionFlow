@@ -295,6 +295,162 @@ Evidence directories are git-ignored (`docs/evidence/run_*`); only the `.gitkeep
 
 ---
 
+## Professor Demonstration: Distributed Spark Execution
+
+This section shows how to prove that the Spark Structured Streaming job runs in **cluster mode across two workers**, distributes executor tasks between them, and produces real analytics outputs.
+
+### Cluster mode enforcement
+
+`spark-jobs/entrypoint.sh` always submits to `spark://spark-master:7077`.  If `SPARK_MASTER_URL` is empty or set to a `local[…]` URL the script exits immediately with a clear error — there is no silent degradation to single-process mode.
+
+Spark submit flags for the two-worker Docker cluster:
+
+| Flag | Value | Reason |
+|---|---|---|
+| `--master` | `spark://spark-master:7077` | Always cluster mode |
+| `--executor-memory` | `1g` | Fits inside the 2 G worker budget |
+| `--executor-cores` | `1` | One core per executor → one executor per worker |
+| `--conf spark.cores.max` | `2` | Cap prevents one worker monopolising all cores |
+| `--conf spark.sql.shuffle.partitions` | `4` | Low overhead for a 2-worker cluster |
+
+---
+
+### Step 1 — Start the stack
+
+```bash
+docker compose up -d --build
+```
+
+Wait ~3–5 minutes on first run (Maven build + image pulls).
+
+---
+
+### Step 2 — Confirm two live Spark workers
+
+**Option A — Spark Master UI (visual proof)**
+
+Open **http://localhost:8080** and look for the **Workers** table showing two workers in `ALIVE` state.
+
+**Option B — Spark Master REST API**
+
+```bash
+curl http://localhost:8080/json
+```
+
+The JSON response contains a `workers` array.  Count entries with `"state":"ALIVE"`.  Expected: **2**.
+
+**Option C — Container logs**
+
+```bash
+docker compose logs --tail=50 spark-master
+```
+
+Look for two lines matching:
+
+```
+Registering worker ... with ... cores, ... memory
+```
+
+---
+
+### Step 3 — Generate a large workload
+
+```bash
+# Windows CMD / PowerShell (replace ^ with \ on Linux/macOS)
+curl -X POST http://localhost:8081/api/generator/burst ^
+  -H "Content-Type: application/json" ^
+  -d "{\"numberOfEvents\":10000,\"invalidPercentage\":5,\"highValuePercentage\":2,\"unknownTypePercentage\":3}"
+```
+
+This sends 10,000 events: ~9,500 valid + ~500 invalid.  With `spark.cores.max=2` and Kafka topic partitioned into 3, tasks will be split across both executors.
+
+Wait **~60 seconds** for Spark to process the batch.
+
+---
+
+### Step 4 — Confirm distributed execution
+
+**Streaming job logs (batch processing across executors)**
+
+```bash
+docker compose logs --tail=50 spark-streaming-job
+```
+
+Look for lines like:
+
+```
+Batch 5: processing 10000 records.
+Batch 5: valid=9500 rejected=500
+Batch 5: completed in 12345 ms.
+```
+
+**Worker-1 executor launch**
+
+```bash
+docker compose logs --tail=30 spark-worker-1
+```
+
+Look for `ExecutorRunner` launch messages.
+
+**Worker-2 executor launch**
+
+```bash
+docker compose logs --tail=30 spark-worker-2
+```
+
+Both workers should show executor activity for the same application ID.
+
+---
+
+### Step 5 — Check analytics output
+
+```bash
+# Metrics summary (proves PostgreSQL analytics were written)
+curl http://localhost:8082/api/metrics/summary
+
+# Recent transactions (proves records were processed end-to-end)
+curl http://localhost:8082/api/transactions/recent
+
+# HDFS output (proves distributed file writes)
+docker exec transactionflow-hdfs-namenode hdfs dfs -ls -R /data/transactionflow/raw/transactions
+```
+
+---
+
+### Step 6 — Automated evidence capture
+
+```powershell
+# Basic verification
+.\scripts\verify-spark-cluster.ps1
+
+# Verification + automatic burst of 10 000 transactions
+.\scripts\verify-spark-cluster.ps1 -RunBurst -BurstSize 10000
+```
+
+Creates `docs/evidence/spark_run_<timestamp>/` with:
+
+| File | What it proves |
+|---|---|
+| `01_compose_ps.txt` | All containers running |
+| `02_spark_master_log.txt` | Worker **registration** messages |
+| `03_spark_master_api.txt` | Master state JSON: workers[], activeApps[] |
+| `04_streaming_job_log.txt` | Batch processing + cluster mode (not `local`) |
+| `05_spark_worker1_log.txt` | Executor launched on **worker-1** |
+| `06_spark_worker2_log.txt` | Executor launched on **worker-2** |
+| `07_reporting_metrics.txt` | Analytics results (proves data was processed) |
+| `08_reporting_pipeline.txt` | Pipeline component health |
+
+**Proof chain:**
+
+```
+02/03  →  cluster membership    (workers are ALIVE and registered)
+04     →  application mode      (runs on spark://…, not local)
+05/06  →  both workers active   (executor launched on each worker)
+07/08  →  results               (real analytics from real data)
+```
+
+---
+
 ## Stopping & Cleaning Up
 
 ```bash

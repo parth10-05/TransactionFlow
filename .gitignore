@@ -29,8 +29,10 @@ data/
 
 # ─── Generated evidence snapshots ─────────────────────────────────────────────
 # Timestamped capture directories created by scripts/capture-hdfs-distribution.ps1
+# and scripts/verify-spark-cluster.ps1
 # The .gitkeep placeholder in docs/evidence/ is committed; run_* dirs are not.
 docs/evidence/run_*
+docs/evidence/spark_run_*
 
 # ─── IDE ──────────────────────────────────────────────────────────────────────
 .idea/
