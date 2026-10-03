@@ -28,25 +28,23 @@ public class MetricsService {
     private final HighValueTransactionRepository highValueTransactionRepository;
     private final RecentTransactionRepository recentTransactionRepository;
 
+    /**
+     * Returns a summary of pipeline metrics.
+     *
+     * <p>All amounts are denominated in <strong>USD</strong>.
+     * TransactionFlow accepts only USD; non-USD records are rejected by the Spark job
+     * with reason "Invalid or unsupported currency" and are never counted in
+     * {@code totalAmountUsd}.
+     */
     public MetricsSummaryResponse getSummary() {
-        long totalTransactions = recentTransactionRepository.count();
+        long totalTransactions    = recentTransactionRepository.count();
         long rejectedTransactions = recentTransactionRepository.findTop20ByStatusOrderByCreatedAtDesc("REJECTED").size();
         long highValueTransactions = highValueTransactionRepository.count();
 
+        // Sum all currency metrics — in a USD-only pipeline this is always USD.
+        // Legacy rows from before the USD migration are included as-is.
         List<TransactionMetricsByCurrency> currencyMetrics = metricsByCurrencyRepository.findLatestByCurrency();
-
-        BigDecimal totalAmountEur = currencyMetrics.stream()
-                .filter(m -> "EUR".equalsIgnoreCase(m.getCurrency()))
-                .map(m -> m.getTotalAmount() != null ? m.getTotalAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal totalAmountGbp = currencyMetrics.stream()
-                .filter(m -> "GBP".equalsIgnoreCase(m.getCurrency()))
-                .map(m -> m.getTotalAmount() != null ? m.getTotalAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
         BigDecimal totalAmountUsd = currencyMetrics.stream()
-                .filter(m -> "USD".equalsIgnoreCase(m.getCurrency()))
                 .map(m -> m.getTotalAmount() != null ? m.getTotalAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -54,8 +52,6 @@ public class MetricsService {
                 .totalTransactions(totalTransactions)
                 .rejectedTransactions(rejectedTransactions)
                 .highValueTransactions(highValueTransactions)
-                .totalAmountEur(totalAmountEur)
-                .totalAmountGbp(totalAmountGbp)
                 .totalAmountUsd(totalAmountUsd)
                 .build();
     }
@@ -72,6 +68,12 @@ public class MetricsService {
         return metricsByCountryRepository.findLatestByCountry();
     }
 
+    /**
+     * Returns per-country aggregated metrics for the map view.
+     *
+     * <p>{@code totalAmount} and {@code averageAmount} are denominated in USD.
+     * The {@code currency} field is explicitly set to {@code "USD"}.
+     */
     public CountryMapDataResponse getCountryMapData() {
         List<TransactionMetricsByCountry> countryMetrics = metricsByCountryRepository.findLatestByCountry();
 
@@ -82,7 +84,7 @@ public class MetricsService {
                         .transactionCount(m.getTransactionCount())
                         .totalAmount(m.getTotalAmount())
                         .averageAmount(m.getAverageAmount())
-                        .currency("EUR")
+                        .currency("USD")     // explicitly USD; was incorrectly "EUR" before
                         .highValueCount(m.getHighValueCount())
                         .rejectedCount(m.getRejectedCount())
                         .lastTransactionAt(m.getLastTransactionAt())

@@ -730,6 +730,38 @@ The credentials in `.env` and `docker-compose.yml` are **local development crede
 
 ---
 
+## Currency Model
+
+TransactionFlow is a **USD-only** demo pipeline. There is **no foreign-exchange conversion** implemented anywhere in the stack.
+
+| Aspect | Details |
+|---|---|
+| **Accepted currency** | `USD` only |
+| **Valid amount threshold** | All amounts treated as USD; `HIGH_VALUE_THRESHOLD=10000` means **$10,000 USD** |
+| **Non-USD records** | Rejected by the Spark job with reason `Invalid or unsupported currency`; written to HDFS rejected path |
+| **Map / country totals** | `totalAmount` and `averageAmount` are USD amounts; the `currency` field returned by the API is always `"USD"` |
+| **FX conversion** | Not implemented — adding live conversion would require an external FX rate API |
+
+### Why USD-only?
+
+A multi-currency pipeline without FX conversion produces misleading aggregations — summing EUR and GBP amounts as if they were the same value. The USD-only model ensures every total, average, and threshold comparison is valid and comparable.
+
+### Fresh demo (reset existing data)
+
+If the PostgreSQL volume contains legacy EUR/GBP rows from before this standardisation, the stored `totalAmount` figures will be a mix of currencies. For a clean classroom demonstration, reset the data volumes before starting:
+
+```bash
+# Stop the stack and delete data volumes (keeps images)
+docker compose down -v
+
+# Restart with a clean database
+docker compose up -d --build
+```
+
+Then generate fresh USD-only data with the burst endpoint.
+
+---
+
 ## What This Project Demonstrates
 
-A practical, interview-ready walk-through of how data moves through a modern streaming stack: Kafka for decoupled ingestion, Spark Structured Streaming for validation/transformation/aggregation running across **two workers**, HDFS + Parquet for raw analytical storage across **two DataNodes**, PostgreSQL as a curated serving layer, a REST reporting layer, and a live visual dashboard — all reproducible with a single `docker compose up`.
+A practical, interview-ready walk-through of how data moves through a modern streaming stack: Kafka for decoupled ingestion, Spark Structured Streaming for validation/transformation/aggregation running across **two workers**, HDFS + Parquet for raw analytical storage across **two DataNodes with replication factor 2**, PostgreSQL as a curated serving layer, a REST reporting layer, and a live visual dashboard — all reproducible with a single `docker compose up`. All demo data is denominated in **USD** for consistent, comparable analytics.

@@ -33,8 +33,12 @@ public class TransactionFlowStreamingJob {
             "DIRECT_DEBIT", "REFUND", "UNKNOWN"
     ));
 
+    // USD-only: TransactionFlow is a USD-denominated demo pipeline.
+    // No FX conversion is implemented. Records with EUR, GBP, or any other
+    // currency are rejected with reason "Invalid or unsupported currency".
+    // HIGH_VALUE_THRESHOLD is denominated in USD.
     private static final Set<String> VALID_CURRENCIES = new HashSet<>(Arrays.asList(
-            "EUR", "GBP", "USD"
+            "USD"
     ));
 
     // ── PostgreSQL table names ─────────────────────────────────────────────────
@@ -63,6 +67,7 @@ public class TransactionFlowStreamingJob {
 
         System.out.println("=================================================");
         System.out.println("TransactionFlow Spark Streaming Job starting up");
+        System.out.println("Currency model : USD-only (no FX conversion)");
         System.out.println("=================================================");
         System.out.println("Kafka brokers  : " + kafkaBootstrapServers);
         System.out.println("Kafka topic    : " + kafkaTopicRaw);
@@ -71,7 +76,7 @@ public class TransactionFlowStreamingJob {
         System.out.println("HDFS checkpoint: " + hdfsCheckpointPath);
         System.out.println("Postgres URL   : " + postgresUrl);
         System.out.println("Postgres user  : " + postgresUser);
-        System.out.println("High-value thr : " + highValueThreshold);
+        System.out.println("High-value thr : $" + highValueThreshold + " USD");
         System.out.println("=================================================");
 
         // ── Wait for Kafka to be available ────────────────────────────────────

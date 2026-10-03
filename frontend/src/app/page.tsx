@@ -35,10 +35,10 @@ function formatNumber(n: number): string {
   return n.toLocaleString()
 }
 
-function formatEur(n: number): string {
-  if (n >= 1_000_000) return `€${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000) return `€${(n / 1_000).toFixed(1)}K`
-  return `€${n.toFixed(2)}`
+function formatUsd(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
+  return `$${n.toFixed(2)}`
 }
 
 export default function DashboardPage() {
@@ -168,8 +168,8 @@ export default function DashboardPage() {
             valueClassName="text-orange-400"
           />
           <MetricCard
-            label="Total Amount (EUR)"
-            value={metrics ? formatEur(metrics.totalAmountEur) : '—'}
+            label="Total Amount (USD)"
+            value={metrics ? formatUsd(metrics.totalAmountUsd) : '—'}
             icon={<DollarSign className="h-5 w-5" />}
             valueClassName="text-blue-400"
           />

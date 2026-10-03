@@ -54,8 +54,7 @@ export interface MetricsSummaryResponse {
   totalTransactions: number
   rejectedTransactions: number
   highValueTransactions: number
-  totalAmountEur: number
-  totalAmountGbp: number
+  /** Total of all valid transaction amounts, denominated in USD. */
   totalAmountUsd: number
 }
 

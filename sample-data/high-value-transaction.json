@@ -5,9 +5,9 @@
   "transactionType": "BANK_TRANSFER",
   "originalTransactionType": null,
   "amount": 25000.00,
-  "currency": "EUR",
+  "currency": "USD",
   "merchant": null,
-  "countryCode": "DE",
-  "countryName": "Germany",
+  "countryCode": "US",
+  "countryName": "United States",
   "createdAt": "2026-06-04T12:32:00Z"
 }

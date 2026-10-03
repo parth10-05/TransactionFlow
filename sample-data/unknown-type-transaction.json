@@ -5,9 +5,9 @@
   "transactionType": "APPLE_PAY",
   "originalTransactionType": null,
   "amount": 9.99,
-  "currency": "GBP",
+  "currency": "USD",
   "merchant": "Spotify",
-  "countryCode": "GB",
-  "countryName": "United Kingdom",
+  "countryCode": "US",
+  "countryName": "United States",
   "createdAt": "2026-06-04T12:33:00Z"
 }

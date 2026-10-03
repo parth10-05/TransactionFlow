@@ -4,10 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { getMetricsByCurrency, getMetricsByType, getMetricsByCountry } from '@/lib/api'
 import type { CurrencyMetrics, TypeMetrics, CountryMetrics } from '@/types'
 
-function formatEur(n: number): string {
-  if (n >= 1_000_000) return `€${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000) return `€${(n / 1_000).toFixed(1)}K`
-  return `€${n.toFixed(2)}`
+function formatUsd(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
+  return `$${n.toFixed(2)}`
 }
 
 function TableHeader({ children }: { children: React.ReactNode }) {
@@ -59,7 +59,7 @@ export default function MetricsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Metrics</h1>
-          <p className="text-slate-400 text-sm mt-1">Breakdown by currency, type and country — polling every 5s</p>
+          <p className="text-slate-400 text-sm mt-1">Breakdown by currency, type and country — all amounts in USD — polling every 5s</p>
         </div>
         {error && (
           <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
@@ -97,8 +97,8 @@ export default function MetricsPage() {
                       <span className="font-mono font-semibold text-blue-400">{row.currency}</span>
                     </TableCell>
                     <TableCell>{row.transactionCount.toLocaleString()}</TableCell>
-                    <TableCell>{formatEur(row.totalAmount)}</TableCell>
-                    <TableCell>{formatEur(row.averageAmount)}</TableCell>
+                    <TableCell>{formatUsd(row.totalAmount)}</TableCell>
+                    <TableCell>{formatUsd(row.averageAmount)}</TableCell>
                   </tr>
                 ))
               )}
@@ -133,7 +133,7 @@ export default function MetricsPage() {
                       </span>
                     </TableCell>
                     <TableCell>{row.transactionCount.toLocaleString()}</TableCell>
-                    <TableCell>{formatEur(row.totalAmount)}</TableCell>
+                    <TableCell>{formatUsd(row.totalAmount)}</TableCell>
                   </tr>
                 ))
               )}
@@ -171,7 +171,7 @@ export default function MetricsPage() {
                       </div>
                     </TableCell>
                     <TableCell>{row.transactionCount.toLocaleString()}</TableCell>
-                    <TableCell>{formatEur(row.totalAmount)}</TableCell>
+                    <TableCell>{formatUsd(row.totalAmount)}</TableCell>
                     <TableCell>
                       <span className="text-orange-400">{row.highValueCount.toLocaleString()}</span>
                     </TableCell>

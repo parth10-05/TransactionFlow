@@ -5,9 +5,9 @@
   "transactionType": "CARD_PAYMENT",
   "originalTransactionType": null,
   "amount": -10.00,
-  "currency": "EUR",
+  "currency": "USD",
   "merchant": "Tesco",
-  "countryCode": "IE",
-  "countryName": "Ireland",
+  "countryCode": "US",
+  "countryName": "United States",
   "createdAt": "2026-06-04T12:31:00Z"
 }

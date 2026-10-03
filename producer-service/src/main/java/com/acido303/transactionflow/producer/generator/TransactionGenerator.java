@@ -60,8 +60,10 @@ public class TransactionGenerator {
             "REVOLUT_TRANSFER", "PAYPAL_PAYMENT", "ATM_REVERSAL", "INTERNAL_ADJUSTMENT"
     ));
 
-    // Fixed — changing currencies would break Spark validation logic
-    private static final List<String> CURRENCIES   = List.of("EUR", "GBP", "USD");
+    // USD-only: TransactionFlow is a USD-denominated demo pipeline.
+    // No foreign-exchange conversion is implemented; using a single currency
+    // ensures all amounts, totals, and the high-value threshold are comparable.
+    private static final List<String> CURRENCIES   = List.of("USD");
     private static final List<String> VALID_TYPES  = List.of(
             "CARD_PAYMENT", "CASH_WITHDRAWAL", "BANK_TRANSFER", "DIRECT_DEBIT", "REFUND"
     );

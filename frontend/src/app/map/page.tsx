@@ -9,8 +9,8 @@ type Metric = 'transactionCount' | 'totalAmount' | 'averageAmount' | 'highValueC
 
 const METRIC_OPTIONS: { key: Metric; label: string }[] = [
   { key: 'transactionCount', label: 'Transaction Count' },
-  { key: 'totalAmount', label: 'Total Amount (EUR)' },
-  { key: 'averageAmount', label: 'Average Amount (EUR)' },
+  { key: 'totalAmount', label: 'Total Amount (USD)' },
+  { key: 'averageAmount', label: 'Average Amount (USD)' },
   { key: 'highValueCount', label: 'High-Value Count' },
   { key: 'rejectedCount', label: 'Rejected Count' },
 ]
@@ -27,7 +27,7 @@ function getColor(value: number, max: number): string {
 
 function formatValue(key: Metric, value: number): string {
   if (key === 'totalAmount' || key === 'averageAmount') {
-    return `€${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
   }
   return value.toLocaleString()
 }
@@ -188,7 +188,7 @@ export default function MapPage() {
             >
               <p className="font-semibold text-slate-100 mb-1">{tooltip.country.countryName}</p>
               <p className="text-slate-400">Transactions: <span className="text-slate-200">{tooltip.country.transactionCount.toLocaleString()}</span></p>
-              <p className="text-slate-400">Total: <span className="text-slate-200">€{tooltip.country.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></p>
+              <p className="text-slate-400">Total: <span className="text-slate-200">${tooltip.country.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></p>
               <p className="text-slate-400">High-Value: <span className="text-orange-400">{tooltip.country.highValueCount}</span></p>
               <p className="text-slate-400">Rejected: <span className="text-red-400">{tooltip.country.rejectedCount}</span></p>
             </div>
@@ -228,8 +228,8 @@ export default function MapPage() {
             <div className="space-y-3">
               {[
                 { label: 'Transactions', value: selected.transactionCount.toLocaleString() },
-                { label: 'Total Amount', value: `€${selected.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
-                { label: 'Average Amount', value: `€${selected.averageAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}` },
+                { label: 'Total Amount (USD)', value: `$${selected.totalAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
+                { label: 'Average Amount (USD)', value: `$${selected.averageAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}` },
                 { label: 'High-Value', value: selected.highValueCount.toLocaleString() },
                 { label: 'Rejected', value: selected.rejectedCount.toLocaleString() },
               ].map(({ label, value }) => (

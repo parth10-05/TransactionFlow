@@ -497,14 +497,15 @@ export default function GeneratorPage() {
               <div className="rounded-lg border border-slate-700 bg-slate-800 p-5 space-y-3">
                 <h3 className="font-semibold text-slate-200">Fixed Values</h3>
                 <p className="text-xs text-slate-500 -mt-2">
-                  These are validated by the Spark pipeline and cannot be changed at runtime.
+                  These are enforced by the Spark pipeline and cannot be changed at runtime.
+                  All amounts are denominated in <span className="text-blue-400 font-mono">USD</span> — no FX conversion is implemented.
                 </p>
                 <div className="flex gap-8">
                   <div>
-                    <p className="text-xs text-slate-500 mb-1.5">Currencies</p>
+                    <p className="text-xs text-slate-500 mb-1.5">Currency (USD-only)</p>
                     <div className="flex gap-2">
                       {config.currencies.map((c) => (
-                        <span key={c} className="rounded-full bg-slate-700 px-3 py-1 text-xs font-mono text-blue-400">
+                        <span key={c} className="rounded-full bg-blue-900/40 border border-blue-500/30 px-3 py-1 text-xs font-mono text-blue-400">
                           {c}
                         </span>
                       ))}
