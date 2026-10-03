@@ -1,0 +1,5 @@
+# This directory holds timestamped HDFS evidence snapshots captured by
+# scripts/capture-hdfs-distribution.ps1
+#
+# Generated evidence directories are git-ignored (see .gitignore).
+# Only this placeholder is committed so the path exists in the repository.

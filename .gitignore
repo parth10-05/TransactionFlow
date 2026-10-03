@@ -27,6 +27,11 @@ frontend/yarn-error.log*
 # Local volume data if ever bind-mounted to a folder
 data/
 
+# ─── Generated evidence snapshots ─────────────────────────────────────────────
+# Timestamped capture directories created by scripts/capture-hdfs-distribution.ps1
+# The .gitkeep placeholder in docs/evidence/ is committed; run_* dirs are not.
+docs/evidence/run_*
+
 # ─── IDE ──────────────────────────────────────────────────────────────────────
 .idea/
 *.iml

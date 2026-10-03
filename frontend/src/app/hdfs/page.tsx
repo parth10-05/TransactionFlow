@@ -26,14 +26,14 @@ interface PathCardProps {
   title: string
   description: string
   path: string
-  fileCount: number
+  batchCount?: number
   lastWrite?: string | null
   statusText?: string
   accent: string
   iconColor: string
 }
 
-function PathCard({ title, description, path, fileCount, lastWrite, statusText, accent, iconColor }: PathCardProps) {
+function PathCard({ title, description, path, batchCount, lastWrite, statusText, accent, iconColor }: PathCardProps) {
   return (
     <div className={`rounded-lg border ${accent} bg-slate-800 p-5`}>
       <div className="flex items-start gap-3 mb-4">
@@ -48,7 +48,7 @@ function PathCard({ title, description, path, fileCount, lastWrite, statusText, 
 
       <div className="space-y-0">
         <StatRow label="HDFS Path" value={path} mono />
-        <StatRow label="Files written" value={fileCount.toLocaleString()} />
+        {batchCount !== undefined && <StatRow label="Spark batches written" value={batchCount.toLocaleString()} />}
         {statusText && <StatRow label="Status" value={statusText} />}
         {lastWrite && <StatRow label="Last write" value={formatTime(lastWrite)} />}
       </div>
@@ -143,36 +143,45 @@ export default function HdfsPage() {
             <p>Checkpoint: <span className={status.checkpointStatus === 'ACTIVE' ? 'text-green-400' : 'text-slate-400'}>
               {status.checkpointStatus ?? '—'}
             </span></p>
+            {status.metricsSource && (
+              <p className="text-slate-600 italic">Source: {status.metricsSource}</p>
+            )}
           </div>
         )}
       </div>
 
       {/* Path cards */}
       {status ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
           <PathCard
             title="Raw Transactions"
-            description="Valid transactions stored as partitioned Parquet"
+            description="Valid transactions — partitioned Parquet"
             path={status.rawPath}
-            fileCount={status.rawFilesWritten ?? 0}
+            batchCount={status.sparkRawBatchesWritten ?? 0}
             lastWrite={status.lastRecordedAt}
             accent="border-blue-500/20"
             iconColor="text-blue-400"
           />
           <PathCard
             title="Rejected Transactions"
-            description="Invalid records stored as JSON for audit"
+            description="Invalid records — JSON for audit"
             path={status.rejectedPath}
-            fileCount={status.rejectedFilesWritten ?? 0}
+            batchCount={status.sparkRejectedBatchesWritten ?? 0}
             lastWrite={status.lastRecordedAt}
             accent="border-red-500/20"
             iconColor="text-red-400"
           />
           <PathCard
+            title="Processed"
+            description="Post-processing output directory"
+            path={status.processedPath}
+            accent="border-emerald-500/20"
+            iconColor="text-emerald-400"
+          />
+          <PathCard
             title="Checkpoints"
-            description="Spark Structured Streaming recovery data"
+            description="Spark Structured Streaming recovery"
             path={status.checkpointPath}
-            fileCount={0}
             statusText={status.checkpointStatus ?? '—'}
             lastWrite={status.lastRecordedAt}
             accent="border-purple-500/20"
@@ -193,8 +202,9 @@ export default function HdfsPage() {
           </h2>
           <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 space-y-2">
             {[
-              { label: 'Raw',         path: status.rawPath },
-              { label: 'Rejected',    path: status.rejectedPath },
+              { label: 'Raw',       path: status.rawPath },
+              { label: 'Rejected',  path: status.rejectedPath },
+              { label: 'Processed', path: status.processedPath },
               { label: 'Checkpoints', path: status.checkpointPath },
             ].map(({ label, path }) => (
               <div key={label} className="flex items-center gap-3">
@@ -205,6 +215,10 @@ export default function HdfsPage() {
               </div>
             ))}
           </div>
+          <p className="text-xs text-slate-600 mt-2 italic">
+            ℹ️ Counts above reflect Spark write batches (sourced from PostgreSQL), not a live HDFS query.
+            For real-time DataNode health run: <code className="font-mono">docker exec transactionflow-hdfs-namenode hdfs dfsadmin -report</code>
+          </p>
         </section>
       )}
     </div>

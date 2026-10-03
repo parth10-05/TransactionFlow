@@ -154,13 +154,17 @@ export interface HdfsStatus {
   namenodeUrl: string
   rawPath: string
   rejectedPath: string
+  processedPath: string
   checkpointPath: string
-  rawFilesWritten: number
-  rejectedFilesWritten: number
+  /** Spark-reported write batches (not a live HDFS file count) */
+  sparkRawBatchesWritten: number
+  /** Spark-reported write batches (not a live HDFS file count) */
+  sparkRejectedBatchesWritten: number
   lastBatchId?: number
   lastRecordedAt?: string
   checkpointStatus: string
   timestamp: string
+  metricsSource?: string
 }
 
 // ─── Generator ────────────────────────────────────────────────────────────────
