@@ -43,14 +43,14 @@ public class KafkaProducerService {
      *
      * @param event the transaction event to publish
      */
-    public void send(TransactionEvent event) {
+    public CompletableFuture<SendResult<String, String>> send(TransactionEvent event) {
         String payload;
         try {
             payload = objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialise TransactionEvent transactionId={}: {}",
                     event.getTransactionId(), e.getMessage(), e);
-            return;
+            return CompletableFuture.failedFuture(e);
         }
 
         CompletableFuture<SendResult<String, String>> future =
@@ -71,6 +71,8 @@ public class KafkaProducerService {
                         count);
             }
         });
+
+        return future;
     }
 
     // -------------------------------------------------------------------------

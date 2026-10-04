@@ -202,10 +202,8 @@ For replication to work, **both DataNode containers must be running and register
 ### Step 1 — Generate enough data
 
 ```bash
-# Windows PowerShell / CMD (replace ^ with \ on Linux/macOS)
-curl -X POST http://localhost:8081/api/generator/burst ^
-  -H "Content-Type: application/json" ^
-  -d "{\"numberOfEvents\":500,\"invalidPercentage\":5,\"highValuePercentage\":2,\"unknownTypePercentage\":3}"
+# Windows PowerShell
+Invoke-RestMethod -Uri "http://localhost:8081/api/generator/burst" -Method Post -ContentType "application/json" -Body '{"numberOfEvents":500,"invalidPercentage":5,"highValuePercentage":2,"unknownTypePercentage":3}'
 ```
 
 Wait ~30 seconds for the Spark streaming job to complete a batch.

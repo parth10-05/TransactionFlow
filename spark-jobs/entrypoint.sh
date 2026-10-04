@@ -7,7 +7,7 @@
 # is wrong the job fails immediately so the problem is visible, not silent.
 #
 # Spark conf summary for the 2-worker Docker cluster:
-#   --executor-memory 1g    : fits inside the 2G worker memory budget
+#   --executor-memory 512m  : fits a two-worker cluster on an 8-GB Docker host
 #   --executor-cores 1      : one core per executor, one executor per worker
 #   --conf spark.cores.max=2: cap total cores so each worker gets exactly 1
 #   shuffle.partitions=4    : low enough to avoid excessive shuffle overhead
@@ -39,8 +39,8 @@ echo "================================================="
 
 exec /opt/spark/bin/spark-submit \
   --master "${SPARK_MASTER_URL}" \
-  --driver-memory 1g \
-  --executor-memory 1g \
+  --driver-memory "${SPARK_DRIVER_MEMORY:-512m}" \
+  --executor-memory "${SPARK_EXECUTOR_MEMORY:-512m}" \
   --executor-cores 1 \
   --conf spark.cores.max=2 \
   --conf spark.sql.shuffle.partitions=4 \

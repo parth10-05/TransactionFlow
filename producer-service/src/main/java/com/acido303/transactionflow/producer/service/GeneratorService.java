@@ -9,7 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -140,23 +144,37 @@ public class GeneratorService {
     }
 
     /**
-     * Emits a burst of events synchronously, applying the per-event type distribution
-     * specified in {@code req}.
+     * Emits a burst of events and waits for bounded Kafka acknowledgements before
+     * returning. This ensures the API response reflects accepted messages rather
+     * than reporting zero while asynchronous sends are still pending.
      */
     public void burst(BurstRequest req) {
         log.info("Burst started: numberOfEvents={} invalidPct={} highValuePct={} unknownTypePct={}",
                 req.getNumberOfEvents(), req.getInvalidPercentage(),
                 req.getHighValuePercentage(), req.getUnknownTypePercentage());
 
+        List<CompletableFuture<?>> acknowledgements = new ArrayList<>(req.getNumberOfEvents());
         for (int i = 0; i < req.getNumberOfEvents(); i++) {
             TransactionEvent event = pickEventType(
                     req.getInvalidPercentage(),
                     req.getHighValuePercentage(),
                     req.getUnknownTypePercentage());
-            kafkaProducerService.send(event);
+            acknowledgements.add(kafkaProducerService.send(event));
         }
 
-        log.info("Burst completed: {} events sent", req.getNumberOfEvents());
+        try {
+            CompletableFuture.allOf(acknowledgements.toArray(CompletableFuture[]::new))
+                    .get(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for Kafka burst acknowledgements", e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("Kafka rejected one or more burst events", e.getCause());
+        } catch (java.util.concurrent.TimeoutException e) {
+            throw new IllegalStateException("Timed out waiting for Kafka burst acknowledgements", e);
+        }
+
+        log.info("Burst completed and acknowledged: {} events sent", req.getNumberOfEvents());
     }
 
     // -------------------------------------------------------------------------
